@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}{{ node.name }} - {{ node.display }} - 热点聚合平台{% endblock %}
+
+{% block content %}
+<div>
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center">
+            {% if node.logo %}
+            <img src="{{ node.logo }}" alt="{{ node.name }}" class="w-8 h-8 mr-2">
+            {% endif %}
+            <h1 class="text-2xl font-bold">{{ node.name }} - {{ node.display }}</h1>
+        </div>
+        
+        <div class="flex space-x-2">
+            <button id="refresh-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">刷新榜单</button>
+            
+            <div class="relative">
+                <button id="history-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">历史数据</button>
+                <div id="history-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md border border-gray-200 z-10">
+                    <div class="p-2">
+                        <label class="block text-sm mb-1">选择日期:</label>
+                        <input type="date" id="history-date" class="w-full p-2 border rounded">
+                        <button id="load-history" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm w-full hover:bg-blue-600 transition-colors">查看</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="items-container">
+        {% if items %}
+            <ul class="divide-y divide-gray-200">
+                {% for item in items %}
+                    <li class="py-4">
+                        <div class="flex justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-2">
+                                    <a href="{{ item.url }}" target="_blank" class="text-lg font-medium text-blue-600 hover:underline">{{ item.title }}</a>
+                                    <span class="text-red-500 font-bold ml-2">{{ item.extra }}</span>
+                                </div>
+                                {% if item.description %}
+                                <p class="text-gray-600 text-sm">{{ item.description }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-gray-500">暂无内容</p>
+        {% endif %}
+    </div>
+    
+    {% if items %}
+    <div class="text-center mt-8">
+        <button id="load-more" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 transition-colors">加载更多</button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        let offset = {{ items|length }};
+        const limit = 20;
+        const nodeHashid = '{{ node.hashid }}';
+        
+        // 加载更多内容
+        $('#load-more').on('click', function() {
+            $.ajax({
+                url: '{{ url_for("main.load_more") }}',
+                data: {
+                    hashid: nodeHashid,
+                    offset: offset,
+                    limit: limit
+                },
+                success: function(response) {
+                    if (response.items.length > 0) {
+                        for (const item of response.items) {
+                            let html = `
+                                <li class="py-4">
+                                    <div class="flex justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex justify-between mb-2">
+                                                <a href="${item.url}" target="_blank" class="text-lg font-medium text-blue-600 hover:underline">${item.title}</a>
+                                                <span class="text-red-500 font-bold ml-2">${item.extra || ''}</span>
+                                            </div>
+                                            ${item.description ? `<p class="text-gray-600 text-sm">${item.description}</p>` : ''}
+                                        </div>
+                                    </div>
+                                </li>
+                            `;
+                            $('#items-container ul').append(html);
+                        }
+                        
+                        offset += response.items.length;
+                        
+                        if (!response.has_more) {
+                            $('#load-more').hide();
+                        }
+                    } else {
+                        $('#load-more').hide();
+                    }
+                }
+            });
+        });
+        
+        // 刷新榜单
+        $('#refresh-btn').on('click', function() {
+            const btn = $(this);
+            btn.prop('disabled', true).text('刷新中...');
+            
+            $.ajax({
+                url: '{{ url_for("api.refresh_node", hashid=node.hashid) }}',
+                success: function(response) {
+                    if (response.success) {
+                        // 不刷新页面，而是直接使用返回的items数据更新DOM
+                        if (response.items && response.items.length > 0) {
+                            $('#items-container').html('<ul class="divide-y divide-gray-200"></ul>');
+                            for (const item of response.items) {
+                                // 重用现有的HTML模板构建代码
+                                let html = `
+                                    <li class="py-4">
+                                        <div class="flex justify-between">
+                                            <div class="flex-1">
+                                                <div class="flex justify-between mb-2">
+                                                    <a href="${item.url}" target="_blank" class="text-lg font-medium text-blue-600 hover:underline">${item.title}</a>
+                                                    <span class="text-red-500 font-bold ml-2">${item.extra || ''}</span>
+                                                </div>
+                                                ${item.description ? `<p class="text-gray-600 text-sm">${item.description}</p>` : ''}
+                                            </div>
+                                        </div>
+                                    </li>
+                                `;
+                                $('#items-container ul').append(html);
+                            }
+                        }
+                        // 显示成功消息
+                        //alert('刷新成功: ' + response.message);
+                    } else {
+                        alert('刷新失败: ' + response.message);
+                    }
+                    btn.prop('disabled', false).text('刷新榜单');
+                },
+                error: function() {
+                    alert('请求失败，请重试');
+                    btn.prop('disabled', false).text('刷新榜单');
+                }
+            });
+        });
+        
+        // 历史数据下拉菜单
+        $('#history-btn').on('click', function() {
+            $('#history-dropdown').toggleClass('hidden');
+        });
+        
+        // 点击其他地方关闭下拉菜单
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#history-btn, #history-dropdown').length) {
+                $('#history-dropdown').addClass('hidden');
+            }
+        });
+        
+        // 加载历史数据
+        $('#load-history').on('click', function() {
+            const date = $('#history-date').val();
+            
+            if (!date) {
+                alert('请选择日期');
+                return;
+            }
+            
+            const btn = $(this);
+            btn.prop('disabled', true).text('加载中...');
+            
+            $.ajax({
+                url: '{{ url_for("api.get_node_history", hashid=node.hashid) }}',
+                data: { date: date },
+                success: function(response) {
+                    if (response.success) {
+                        if (response.items.length > 0) {
+                            $('#items-container').html('<ul class="divide-y divide-gray-200"></ul>');
+                            
+                            for (const item of response.items) {
+                                let html = `
+                                    <li class="py-4">
+                                        <div class="flex justify-between">
+                                            <div class="flex-1">
+                                                <div class="flex justify-between mb-2">
+                                                    <a href="${item.url}" target="_blank" class="text-lg font-medium text-blue-600 hover:underline">${item.title}</a>
+                                                    <span class="text-red-500 font-bold ml-2">${item.extra || ''}</span>
+                                                </div>
+                                                ${item.description ? `<p class="text-gray-600 text-sm">${item.description}</p>` : ''}
+                                            </div>
+                                        </div>
+                                    </li>
+                                `;
+                                $('#items-container ul').append(html);
+                            }
+                            
+                            // 隐藏加载更多按钮
+                            $('#load-more').hide();
+                            
+                            // 添加返回当前数据的按钮
+                            if (!$('#back-to-current').length) {
+                                $('#items-container').before(`
+                                    <div class="mb-4">
+                                        <div class="bg-blue-100 text-blue-800 p-3 rounded flex justify-between items-center">
+                                            <span>显示 ${date} 的历史数据 (${response.items.length} 条)</span>
+                                            <button id="back-to-current" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors">返回当前数据</button>
+                                        </div>
+                                    </div>
+                                `);
+                                
+                                $('#back-to-current').on('click', function() {
+                                    location.reload();
+                                });
+                            }
+                        } else {
+                            alert('该日期没有历史数据');
+                        }
+                    } else {
+                        alert('获取历史数据失败: ' + response.message);
+                    }
+                    
+                    btn.prop('disabled', false).text('查看');
+                    $('#history-dropdown').addClass('hidden');
+                },
+                error: function() {
+                    alert('请求失败，请重试');
+                    btn.prop('disabled', false).text('查看');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %} 

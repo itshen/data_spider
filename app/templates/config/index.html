@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}配置 - 热点聚合平台{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold mb-6">系统配置</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- API密钥配置 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">API密钥设置</h2>
+            <form id="api-key-form" class="space-y-4">
+                <div>
+                    <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">API密钥</label>
+                    <input type="text" id="api-key" name="api_key" value="{{ config.api_key or '' }}" placeholder="请输入您的API密钥" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="text-sm text-gray-500 mt-1">从<a href="https://api.tophubdata.com" target="_blank" class="text-blue-500 hover:underline">官方网站</a>获取API密钥</p>
+                </div>
+                <div>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存</button>
+                </div>
+                <div id="api-key-message" class="hidden"></div>
+            </form>
+        </div>
+        
+        <!-- 刷新间隔设置 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">刷新设置</h2>
+            <form id="refresh-form" class="space-y-4">
+                <div>
+                    <label for="refresh-interval" class="block text-sm font-medium text-gray-700 mb-1">普通榜单刷新间隔（秒）</label>
+                    <input type="number" id="refresh-interval" name="refresh_interval" value="{{ config.refresh_interval or 7200 }}" min="300" step="300" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="text-sm text-gray-500 mt-1">建议最小设置为7200秒（2小时）</p>
+                    <p class="text-sm text-gray-500 mt-1">注意: 榜中榜内容固定为每天更新一次</p>
+                </div>
+                <div>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存</button>
+                </div>
+                <div id="refresh-message" class="hidden"></div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- API日志和统计 -->
+    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">API统计与日志</h2>
+            <a href="{{ url_for('config.api_logs') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">查看API日志</a>
+        </div>
+        <p class="text-gray-600">查看API调用记录，统计接口使用情况，帮助您与API提供方进行对账。</p>
+    </div>
+    
+    <!-- 榜单配置 -->
+    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">榜单配置</h2>
+            <button id="fetch-nodes-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">刷新榜单列表</button>
+        </div>
+        
+        <div id="fetch-message" class="hidden mb-4"></div>
+        
+        <div class="mb-4">
+            <p class="text-gray-600">选择您想要启用的榜单，启用后系统将定期获取这些榜单的最新内容。</p>
+            <p class="text-gray-600 mt-1">普通榜单每两小时更新一次，榜中榜每天更新一次。</p>
+        </div>
+        
+        <!-- 搜索过滤功能 -->
+        <div class="mb-4">
+            <div class="relative">
+                <input type="text" id="search-nodes" placeholder="搜索榜单..." class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-2">
+                <span class="text-sm text-gray-600">分类筛选:</span>
+                <button class="category-filter text-sm px-2 py-1 rounded border border-blue-500 bg-blue-100 text-blue-700 hover:bg-blue-200" data-cid="all">全部</button>
+                {% for cid, category in categories.items() %}
+                    {% if category.nodes %}
+                        <button class="category-filter text-sm px-2 py-1 rounded border border-gray-300 hover:bg-gray-100" data-cid="{{ cid }}">{{ category.name }}</button>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- 榜单表格 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 text-left">
+                        <th class="px-4 py-2 border">启用</th>
+                        <th class="px-4 py-2 border">名称</th>
+                        <th class="px-4 py-2 border">显示名</th>
+                        <th class="px-4 py-2 border">分类</th>
+                        <th class="px-4 py-2 border">域名</th>
+                    </tr>
+                </thead>
+                <tbody id="nodes-table-body">
+                    {% for cid, category in categories.items() %}
+                        {% for node in category.nodes %}
+                            <tr class="node-row" data-hashid="{{ node.hashid }}" data-cid="{{ cid }}" data-name="{{ node.name }}" data-display="{{ node.display }}" data-domain="{{ node.domain }}">
+                                <td class="px-4 py-2 border">
+                                    <input type="checkbox" id="node-{{ node.hashid }}" class="node-checkbox" 
+                                           {% if node.is_enabled %}checked{% endif %}
+                                           data-hashid="{{ node.hashid }}">
+                                </td>
+                                <td class="px-4 py-2 border">{{ node.name }}</td>
+                                <td class="px-4 py-2 border">{{ node.display }}</td>
+                                <td class="px-4 py-2 border">{{ category.name }}</td>
+                                <td class="px-4 py-2 border">{{ node.domain }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // API密钥设置
+        $('#api-key-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const apiKey = $('#api-key').val();
+            const messageBox = $('#api-key-message');
+            
+            $.ajax({
+                url: '{{ url_for("config.update_api_key") }}',
+                method: 'POST',
+                data: { api_key: apiKey },
+                success: function(response) {
+                    messageBox.removeClass('hidden bg-red-100 text-red-700 bg-green-100 text-green-700');
+                    
+                    if (response.success) {
+                        messageBox.addClass('bg-green-100 text-green-700').text(response.message);
+                    } else {
+                        messageBox.addClass('bg-red-100 text-red-700').text(response.message);
+                    }
+                    
+                    messageBox.addClass('p-3 rounded mt-3');
+                },
+                error: function() {
+                    messageBox.removeClass('hidden bg-green-100 text-green-700')
+                              .addClass('bg-red-100 text-red-700 p-3 rounded mt-3')
+                              .text('请求失败，请重试');
+                }
+            });
+        });
+        
+        // 刷新间隔设置
+        $('#refresh-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const refreshInterval = $('#refresh-interval').val();
+            const messageBox = $('#refresh-message');
+            
+            $.ajax({
+                url: '{{ url_for("config.update_refresh_interval") }}',
+                method: 'POST',
+                data: { refresh_interval: refreshInterval },
+                success: function(response) {
+                    messageBox.removeClass('hidden bg-red-100 text-red-700 bg-green-100 text-green-700');
+                    
+                    if (response.success) {
+                        messageBox.addClass('bg-green-100 text-green-700').text(response.message);
+                    } else {
+                        messageBox.addClass('bg-red-100 text-red-700').text(response.message);
+                    }
+                    
+                    messageBox.addClass('p-3 rounded mt-3');
+                },
+                error: function() {
+                    messageBox.removeClass('hidden bg-green-100 text-green-700')
+                              .addClass('bg-red-100 text-red-700 p-3 rounded mt-3')
+                              .text('请求失败，请重试');
+                }
+            });
+        });
+        
+        // 榜单状态切换
+        $('.node-checkbox').on('change', function() {
+            const checkbox = $(this);
+            const hashid = checkbox.data('hashid');
+            const isEnabled = checkbox.prop('checked');
+            
+            $.ajax({
+                url: '{{ url_for("config.update_node_status") }}',
+                method: 'POST',
+                data: {
+                    hashid: hashid,
+                    is_enabled: isEnabled
+                },
+                success: function(response) {
+                    if (!response.success) {
+                        // 恢复原状态
+                        checkbox.prop('checked', !isEnabled);
+                        alert(response.message);
+                    }
+                },
+                error: function() {
+                    // 恢复原状态
+                    checkbox.prop('checked', !isEnabled);
+                    alert('请求失败，请重试');
+                }
+            });
+        });
+        
+        // 刷新榜单列表
+        $('#fetch-nodes-btn').on('click', function() {
+            const btn = $(this);
+            const messageBox = $('#fetch-message');
+            
+            btn.prop('disabled', true).text('正在获取...');
+            
+            $.ajax({
+                url: '{{ url_for("config.fetch_nodes") }}',
+                success: function(response) {
+                    messageBox.removeClass('hidden bg-red-100 text-red-700 bg-green-100 text-green-700');
+                    
+                    if (response.success) {
+                        messageBox.addClass('bg-green-100 text-green-700').text(response.message);
+                        // 刷新页面以显示新获取的榜单
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        messageBox.addClass('bg-red-100 text-red-700').text(response.message);
+                        btn.prop('disabled', false).text('刷新榜单列表');
+                    }
+                    
+                    messageBox.addClass('p-3 rounded');
+                },
+                error: function() {
+                    messageBox.removeClass('hidden bg-green-100 text-green-700')
+                              .addClass('bg-red-100 text-red-700 p-3 rounded')
+                              .text('请求失败，请重试');
+                    btn.prop('disabled', false).text('刷新榜单列表');
+                }
+            });
+        });
+        
+        // 榜单搜索过滤功能
+        $('#search-nodes').on('input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            filterNodes();
+        });
+        
+        // 分类筛选功能
+        $(document).on('click', '.category-filter', function() {
+            $('.category-filter').removeClass('bg-blue-100 text-blue-700 border-blue-500')
+                                .addClass('border-gray-300');
+            $(this).removeClass('border-gray-300')
+                   .addClass('bg-blue-100 text-blue-700 border-blue-500');
+            
+            console.log("选择分类: " + $(this).text() + ", ID: " + $(this).data('cid'));
+            filterNodes();
+        });
+        
+        // 筛选功能实现
+        function filterNodes() {
+            const searchTerm = $('#search-nodes').val().toLowerCase();
+            const selectedCategory = $('.category-filter.bg-blue-100').data('cid');
+            let visibleCount = 0;
+            let totalCount = 0;
+            
+            console.log("筛选参数 - 搜索词: '" + searchTerm + "', 分类ID: '" + selectedCategory + "'");
+            
+            // 显示所有行，然后根据条件隐藏不匹配的行
+            $('.node-row').show().each(function() {
+                totalCount++;
+                const $row = $(this);
+                const nodeName = $row.data('name') ? $row.data('name').toString().toLowerCase() : '';
+                const nodeDisplay = $row.data('display') ? $row.data('display').toString().toLowerCase() : '';
+                const nodeDomain = $row.data('domain') ? $row.data('domain').toString().toLowerCase() : '';
+                const nodeCid = $row.data('cid');
+                
+                // 从表格单元格中获取分类的名称
+                const categoryText = $row.find('td:eq(3)').text().toLowerCase();
+                
+                // 搜索匹配: 空搜索或任一字段包含搜索词
+                const matchesSearch = searchTerm === '' || 
+                    nodeName.indexOf(searchTerm) > -1 || 
+                    nodeDisplay.indexOf(searchTerm) > -1 || 
+                    nodeDomain.indexOf(searchTerm) > -1 || 
+                    categoryText.indexOf(searchTerm) > -1;
+                
+                // 分类匹配: 选择"全部"或分类ID匹配
+                const matchesCategory = selectedCategory === 'all' || 
+                                       (nodeCid !== undefined && 
+                                        selectedCategory !== undefined && 
+                                        String(selectedCategory) === String(nodeCid));
+                
+                if (matchesSearch && matchesCategory) {
+                    visibleCount++;
+                } else {
+                    $row.hide();
+                }
+            });
+            
+            // 显示筛选结果统计
+            if ($('#filter-stats').length === 0) {
+                $('#nodes-table-body').after('<div id="filter-stats" class="mt-2 text-sm text-gray-600"></div>');
+            }
+            $('#filter-stats').text(`显示 ${visibleCount} / ${totalCount} 个榜单`);
+            
+            // 显示调试信息
+            console.log(`筛选结果: 显示 ${visibleCount}/${totalCount} 个榜单`);
+        }
+        
+        // 默认选中"全部"分类并执行初始筛选
+        $('.category-filter[data-cid="all"]').trigger('click');
+        
+        // 确保所有行在页面加载完成后都能被正确筛选
+        $(window).on('load', function() {
+            setTimeout(function() {
+                filterNodes();
+                console.log("页面完全加载后重新筛选");
+            }, 1000);
+        });
+    });
+</script>
+{% endblock %} 

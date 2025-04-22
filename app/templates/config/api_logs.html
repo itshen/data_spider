@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}API调用记录 - 热点聚合平台{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold">API调用记录</h1>
+        <a href="{{ url_for('config.index') }}" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">返回配置</a>
+    </div>
+    
+    <!-- 统计信息卡片 -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">API调用统计</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="text-gray-500 text-sm">总调用次数</div>
+                <div class="text-2xl font-bold text-blue-600">{{ stats.summary.total_calls or 0 }}</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="text-gray-500 text-sm">成功调用</div>
+                <div class="text-2xl font-bold text-green-600">{{ stats.summary.successful_calls or 0 }}</div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg">
+                <div class="text-gray-500 text-sm">失败调用</div>
+                <div class="text-2xl font-bold text-red-600">{{ stats.summary.failed_calls or 0 }}</div>
+            </div>
+            <div class="bg-purple-50 p-4 rounded-lg">
+                <div class="text-gray-500 text-sm">平均响应时间</div>
+                <div class="text-2xl font-bold text-purple-600">{{ "%.2f"|format(stats.summary.avg_time or 0) }}ms</div>
+            </div>
+        </div>
+        
+        <!-- 接口统计表格 -->
+        {% if stats.details %}
+        <h3 class="text-lg font-semibold mb-2">接口详细统计</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 text-left">
+                        <th class="px-4 py-2 border">接口</th>
+                        <th class="px-4 py-2 border">总调用</th>
+                        <th class="px-4 py-2 border">成功</th>
+                        <th class="px-4 py-2 border">失败</th>
+                        <th class="px-4 py-2 border">平均时间(ms)</th>
+                        <th class="px-4 py-2 border">最长时间(ms)</th>
+                        <th class="px-4 py-2 border">最短时间(ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in stats.details %}
+                    <tr>
+                        <td class="px-4 py-2 border">{{ stat.endpoint }}</td>
+                        <td class="px-4 py-2 border">{{ stat.total_calls }}</td>
+                        <td class="px-4 py-2 border text-green-600">{{ stat.successful_calls }}</td>
+                        <td class="px-4 py-2 border text-red-600">{{ stat.failed_calls }}</td>
+                        <td class="px-4 py-2 border">{{ "%.2f"|format(stat.avg_time) }}</td>
+                        <td class="px-4 py-2 border">{{ stat.max_time }}</td>
+                        <td class="px-4 py-2 border">{{ stat.min_time }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">暂无API调用统计数据</p>
+        {% endif %}
+    </div>
+    
+    <!-- 筛选表单 -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">筛选条件</h2>
+        <form method="get" action="{{ url_for('config.api_logs') }}" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date }}" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">结束日期</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date }}" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="endpoint" class="block text-sm font-medium text-gray-700 mb-1">接口名称</label>
+                    <input type="text" id="endpoint" name="endpoint" value="{{ endpoint }}" placeholder="输入接口名称" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="success" class="block text-sm font-medium text-gray-700 mb-1">调用状态</label>
+                    <select id="success" name="success" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="" {% if success is none %}selected{% endif %}>全部</option>
+                        <option value="1" {% if success == true %}selected{% endif %}>成功</option>
+                        <option value="0" {% if success == false %}selected{% endif %}>失败</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">筛选</button>
+                <a href="{{ url_for('config.api_logs') }}" class="ml-2 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">重置</a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- 日志列表 -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">调用日志</h2>
+        
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 text-left">
+                        <th class="px-4 py-2 border">ID</th>
+                        <th class="px-4 py-2 border">时间</th>
+                        <th class="px-4 py-2 border">接口</th>
+                        <th class="px-4 py-2 border">方法</th>
+                        <th class="px-4 py-2 border">状态</th>
+                        <th class="px-4 py-2 border">状态码</th>
+                        <th class="px-4 py-2 border">响应时间</th>
+                        <th class="px-4 py-2 border">详情</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="px-4 py-2 border">{{ log.id }}</td>
+                        <td class="px-4 py-2 border">{{ log.request_time }}</td>
+                        <td class="px-4 py-2 border">{{ log.endpoint }}</td>
+                        <td class="px-4 py-2 border">{{ log.method }}</td>
+                        <td class="px-4 py-2 border">
+                            {% if log.success %}
+                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">成功</span>
+                            {% else %}
+                            <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">失败</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 border">{{ log.status_code }}</td>
+                        <td class="px-4 py-2 border">{{ log.elapsed_time }}ms</td>
+                        <td class="px-4 py-2 border">
+                            <button class="text-blue-500 hover:underline text-sm log-details-btn" data-id="{{ log.id }}" data-params="{{ log.params }}" data-message="{{ log.response_message }}">
+                                查看详情
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页 -->
+        <div class="mt-6 flex justify-between items-center">
+            <div>
+                <span class="text-gray-600">第 {{ page }} 页</span>
+            </div>
+            <div>
+                {% if page > 1 %}
+                <a href="{{ url_for('config.api_logs', page=page-1, start_date=start_date, end_date=end_date, endpoint=endpoint, success=success) }}" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">上一页</a>
+                {% endif %}
+                
+                {% if logs|length == 50 %}
+                <a href="{{ url_for('config.api_logs', page=page+1, start_date=start_date, end_date=end_date, endpoint=endpoint, success=success) }}" class="ml-2 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">下一页</a>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="text-gray-500">暂无API调用日志</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 详情对话框 -->
+<div id="details-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">API调用详情</h3>
+            <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <h4 class="font-medium text-gray-700">请求参数</h4>
+                <pre id="params-data" class="bg-gray-100 p-4 rounded overflow-x-auto text-sm"></pre>
+            </div>
+            <div>
+                <h4 class="font-medium text-gray-700">响应消息</h4>
+                <pre id="message-data" class="bg-gray-100 p-4 rounded overflow-x-auto text-sm"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // 详情弹窗
+        $('.log-details-btn').on('click', function() {
+            const params = $(this).data('params');
+            const message = $(this).data('message');
+            
+            try {
+                // 格式化JSON
+                if (params && params !== '') {
+                    const paramsObj = JSON.parse(params);
+                    $('#params-data').text(JSON.stringify(paramsObj, null, 2));
+                } else {
+                    $('#params-data').text('无参数');
+                }
+            } catch (e) {
+                $('#params-data').text(params || '无参数');
+            }
+            
+            $('#message-data').text(message || '无消息');
+            $('#details-modal').removeClass('hidden');
+        });
+        
+        // 关闭弹窗
+        $('#close-modal').on('click', function() {
+            $('#details-modal').addClass('hidden');
+        });
+        
+        // 点击弹窗外部关闭
+        $('#details-modal').on('click', function(e) {
+            if (e.target === this) {
+                $(this).addClass('hidden');
+            }
+        });
+    });
+</script>
+{% endblock %} 

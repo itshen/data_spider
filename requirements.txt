@@ -1,0 +1,4 @@
+flask
+flask-apscheduler
+requests
+werkzeug
