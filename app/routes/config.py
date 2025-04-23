@@ -86,8 +86,8 @@ def update_refresh_interval():
     from app import scheduler
     
     # 更新获取榜单内容的任务
-    # 将秒转换为小时，但保持最小为2小时
-    node_items_hours = max(2, refresh_interval // 3600)
+    # 将秒转换为小时，但保持最小为12小时
+    node_items_hours = max(12, refresh_interval // 3600)
     scheduler.reschedule_job(
         'fetch_node_items',
         trigger='interval',
@@ -162,7 +162,9 @@ def api_logs():
     
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    endpoint = request.args.get('endpoint')
+    
+    # 同时支持endpoint和api_endpoint参数
+    endpoint = request.args.get('api_endpoint') or request.args.get('endpoint')
     
     success = None
     if 'success' in request.args:
