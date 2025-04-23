@@ -84,14 +84,23 @@ def update_refresh_interval():
     
     # 更新任务调度
     from app import scheduler
+    from app.tasks import fetch_node_items
     
     # 更新获取榜单内容的任务
     # 将秒转换为小时，但保持最小为12小时
     node_items_hours = max(12, refresh_interval // 3600)
-    scheduler.reschedule_job(
-        'fetch_node_items',
+    
+    # 移除现有任务
+    scheduler.remove_job('fetch_node_items')
+    
+    # 添加新的任务
+    import datetime
+    scheduler.add_job(
+        id='fetch_node_items',
+        func=fetch_node_items,
         trigger='interval',
-        hours=node_items_hours
+        hours=node_items_hours,
+        next_run_time=datetime.datetime.now() + datetime.timedelta(minutes=1)  # 1分钟后执行第一次
     )
     
     # 热榜内容保持每天一次，不受刷新间隔影响
