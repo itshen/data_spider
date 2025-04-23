@@ -16,7 +16,7 @@
                 <div>
                     <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">API密钥</label>
                     <input type="text" id="api-key" name="api_key" value="{{ config.api_key or '' }}" placeholder="请输入您的API密钥" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <p class="text-sm text-gray-500 mt-1">从<a href="https://xdxq.com" target="_blank" class="text-blue-500 hover:underline">官方网站</a>获取API密钥</p>
+                    <p class="text-sm text-gray-500 mt-1">从<a href="https://www.tophubdata.com/dashboard" target="_blank" class="text-blue-500 hover:underline">官方网站</a>获取API密钥</p>
                 </div>
                 <div>
                     <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存</button>
@@ -32,7 +32,7 @@
                 <div>
                     <label for="refresh-interval" class="block text-sm font-medium text-gray-700 mb-1">普通榜单刷新间隔（秒）</label>
                     <input type="number" id="refresh-interval" name="refresh_interval" value="{{ config.refresh_interval or 7200 }}" min="300" step="300" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <p class="text-sm text-gray-500 mt-1">建议最小设置为7200秒（2小时）</p>
+                    <p class="text-sm text-gray-500 mt-1">建议最小设置为43200秒（12小时）</p>
                     <p class="text-sm text-gray-500 mt-1">注意: 榜中榜内容固定为每天更新一次</p>
                 </div>
                 <div>
